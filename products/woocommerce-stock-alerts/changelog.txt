@@ -1,0 +1,20 @@
+= 1.0.0 — June 2026 =
+* Initial public release
+* Feature: Real-time email alerts when product stock drops below configurable threshold
+* Feature: Per-product custom threshold — override the global default for specific products
+* Feature: Multiple recipient support — comma-separated email list
+* Feature: Daily digest email summarizing all products below threshold (silent when healthy)
+* Feature: Out-of-stock instant alerts (optional toggle)
+* Feature: Breach audit log stored in custom database table (wc_stock_alert_log)
+* Feature: Log viewer page at WooCommerce → Stock Alert Log with pagination and clear action
+* Feature: Admin products list column showing stock alert status (⚠ low / ✓ healthy / OUT)
+* Feature: Per-product disable toggle in meta box
+* Feature: Customizable email subject and heading with {site_name} and {product_name} placeholders
+* Feature: HTML email format with styled product links
+* Feature: Smart deduplication — prevents duplicate alerts within same request
+* Feature: Covers 4 trigger points: order stock reduction, stock status change, stock quantity set, variation stock set
+* Feature: Variable product support — checks each variation independently with attribute labels
+* Feature: Cron-based daily digest with configurable schedule (default: 8 AM)
+* Feature: Full uninstall cleanup — drops log table, removes options, post meta, and cron
+* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
+* Dev: WordPress coding standards, proper escaping, nonce verification, dbDelta for table creation
