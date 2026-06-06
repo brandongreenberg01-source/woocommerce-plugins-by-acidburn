@@ -1,0 +1,85 @@
+# WOOCOMMERCE GUMROAD STORE — BUILDER AGENT
+
+You are building a Gumroad store with 5 WooCommerce plugin snippets + bundles.
+
+## YOUR MISSION
+
+Build these 5 products in order, one at a time. For EACH product:
+1. Write the PHP plugin file
+2. Create README.txt and changelog.txt
+3. Generate 3 screenshots (before/after/settings) using the image_generate tool
+4. Create the Gumroad product listing via API
+5. Verify the listing exists
+
+After all 5 individual products are live, create 2 bundle products on Gumroad.
+
+## PRODUCTS (build in this order)
+
+### Product 1: Order Auto-Complete — $19
+File: /opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete.php
+Title: "WooCommerce Order Auto-Complete — Simple PHP Plugin"
+Hooks: woocommerce_order_status_processing, woocommerce_payment_complete
+Features: Auto-complete virtual/downloadable orders, filter by payment method, per-product toggle, bulk action in admin
+
+### Product 2: Product Badge System — $19
+File: /opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges.php
+Title: "WooCommerce Custom Product Badges — Sale, New, Featured"
+Hooks: woocommerce_before_shop_loop_item_title, woocommerce_before_single_product_summary
+Features: Badge text + color config, per-product override, position selector, scheduled expiry
+
+### Product 3: Stock Alert System — $29
+File: /opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts.php
+Title: "WooCommerce Stock Alert System — Low Stock Email Notifications"
+Hooks: woocommerce_reduce_order_stock, woocommerce_product_set_stock_status
+Features: Per-product thresholds, multiple recipients, daily digest, breach log
+
+### Product 4: Custom Checkout Fields — $29
+File: /opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields.php
+Title: "WooCommerce Custom Checkout Fields Manager — No Coding Required"
+Hooks: woocommerce_checkout_fields, woocommerce_checkout_process, woocommerce_checkout_update_order_meta
+Features: Drag-drop reorder, conditional display, custom field types, validation
+
+### Product 5: Wholesale Pricing — $39
+File: /opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing.php
+Title: "WooCommerce Wholesale Pricing — Role-Based Tiers & Quantity Discounts"
+Hooks: woocommerce_get_price_html, woocommerce_product_get_price, woocommerce_variation_prices_price
+Features: Role tiers, quantity breaks, minimum order, price hiding
+
+### Bundles (after all 5 are done)
+- Essential Pack (all 5): $99 — custom_price on Gumroad
+- Store Manager Pack (products 1+3+5): $59 — custom_price
+
+## GUMROAD API
+Token: CyGGoEVPli0MT01j_6LY_-KJ_S8tmQEyaAy8zDcsBGo
+Base: https://api.gumroad.com/v2
+Endpoint for creating products: POST https://api.gumroad.com/v2/products
+Format: form-data with access_token=TOKEN as a form field
+Required fields: name, description (HTML), price (in cents, e.g. 1900 for $19), custom_permalink, file or preview_url optional
+
+## CODE STANDARDS
+- WordPress coding style
+- Proper escaping (esc_html, esc_attr, wp_kses)
+- Nonce verification for admin
+- WooCommerce dependency check
+- Uninstall hook cleanup
+- PHP 7.4+, WP 5.0+, WC 4.0+
+- Use the directory: /opt/data/sandy_ops/gumroad-store/products/
+
+## EACH PRODUCT PACKAGE STRUCTURE
+Write to: /opt/data/sandy_ops/gumroad-store/products/{product-name}/
+- plugin-file.php (the main code)
+- README.txt (what it does, how to install)
+- changelog.txt (Version 1.0.0)
+
+## SCREENSHOTS
+Generate 3 per product using image_generate tool. Save to the product directory.
+
+## Progress Tracking
+Save progress to /opt/data/sandy_ops/gumroad-store/progress.json after each completed product.
+Format: {"completed": ["product1", "product2"], "current": "product3", "bundles_done": false}
+
+## VERIFICATION
+After creating each Gumroad listing, verify by calling GET https://api.gumroad.com/v2/products to see the listing exists.
+After bundles, verify all 7 products exist.
+
+START WITH PRODUCT 1 NOW. Build it completely, then move to Product 2. Do not skip steps.
