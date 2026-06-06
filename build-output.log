@@ -1,0 +1,938 @@
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/woocommerce-auto-complete.php → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/woocommerce-auto-complete.php
+@@ -0,0 +1,630 @@
++<?php
++/**
++ * Plugin Name:       WooCommerce Order Auto-Complete
++ * Plugin URI:        https://sandydigital.io
++ * Description:       Automatically mark virtual and downloadable orders as completed. Filter by payment method, per-product toggle, and bulk actions.
++ * Version:           1.0.0
++ * Author:            Sandy Digital
++ * Author URI:        https://sandydigital.io
++ * License:           GPL-2.0+
++ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
++ * Text Domain:       wc-order-auto-complete
++ * Domain Path:       /languages
++ * Requires at least: 5.0
++ * Requires PHP:      7.4
++ * WC requires at least: 4.0
++ * WC tested up to:   9.0
++ *
++ * @package WC_Order_Auto_Complete
++ */
++
++// If this file is called directly, abort.
++if ( ! defined( 'ABSPATH' ) ) {
++	exit;
++}
++
++// WooCommerce dependency check.
++if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
++	return;
++}
++
++/**
++ * Main plugin class.
++ */
++final class WC_Order_Auto_Complete {
++
++	/**
++	 * Plugin instance.
++	 *
++	 * @var WC_Order_Auto_Complete|null
++	 */
++	private static $instance = null;
++
++	/**
++	 * Option name.
++	 *
++	 * @var string
++	 */
++	const OPTION_KEY = 'wc_auto_complete_settings';
++
++	/**
++	 * Get single instance.
++	 *
++	 * @return WC_Order_Auto_Complete
++	 */
++	public static function instance() {
++		if ( null === self::$instance ) {
++			self::$instance = new self();
++		}
++		return self::$instance;
++	}
++
++	/**
++	 * Constructor.
++	 */
++	private function __construct() {
++		add_action( 'init', array( $this, 'load_textdomain' ) );
++		add_filter( 'woocommerce_payment_complete_order_status', array( $this, 'maybe_auto_complete' ), 10, 3 );
++		add_action( 'woocommerce_order_status_processing', array( $this, 'auto_complete_on_processing' ), 10, 2 );
++		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
++		add_action( 'admin_init', array( $this, 'register_settings' ) );
++		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
++
++		// Product-level meta box.
++		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
++		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
++
++		// Bulk action on orders.
++		add_filter( 'bulk_actions-edit-shop_order', array( $this, 'add_bulk_actions' ) );
+… omitted 552 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/README.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/README.txt
+@@ -0,0 +1,87 @@
++=== WooCommerce Order Auto-Complete ===
++Contributors: sandydigital
++Tags: woocommerce, auto-complete, orders, automation, virtual, downloadable
++Requires at least: 5.0
++Tested up to: 6.5
++Requires PHP: 7.4
++Stable tag: 1.0.0
++License: GPL-2.0+
++License URI: https://www.gnu.org/licenses/gpl-2.0.html
++
++Automatically mark WooCommerce orders as "Completed" when they contain only virtual or downloadable products. Save time and streamline your store.
++
++== Description ==
++
++WooCommerce Order Auto-Complete is a lightweight PHP plugin that automatically transitions qualifying orders to "Completed" status — no manual work required.
++
++= Key Features =
++
++* **Smart Auto-Detection** — Automatically detects when an order contains only virtual or downloadable products and completes it instantly after payment.
++* **Payment Method Filtering** — Choose which payment gateways trigger auto-completion. Only auto-complete BACS/cheque orders? You got it.
++* **Per-Product Override** — Add a simple checkbox on any product edit screen to disable auto-complete for that specific product.
++* **Category Exclusions** — Exclude entire product categories from auto-completion.
++* **Bulk Actions** — Apply or remove auto-complete behavior on multiple orders at once from the WooCommerce Orders screen.
++* **Settings Page** — Clean, native WordPress settings page under WooCommerce → Order Auto-Complete.
++* **Uninstall Cleanup** — Removes all plugin data when uninstalled. No orphaned options or post meta.
++
++= How It Works =
++
++1. Install and activate the plugin.
++2. Go to WooCommerce → Order Auto-Complete to configure your preferences.
++3. When a customer places an order that qualifies (virtual/downloadable products, approved payment method, not excluded), the order is automatically marked "Completed."
++4. Optionally, the customer receives the "Order Completed" email notification.
++
++= Use Cases =
++
++* Digital product stores (ebooks, software licenses, music, courses)
++* Membership sites with instant access
++* Any store where fulfillment doesn't require shipping
++
++== Installation ==
++
++1. Upload the `woocommerce-auto-complete.php` file to your `/wp-content/plugins/` directory.
++2. Activate the plugin through the 'Plugins' menu in WordPress.
++3. Go to WooCommerce → Order Auto-Complete to configure settings.
++4. Done! Orders will now auto-complete based on your rules.
++
++== Frequently Asked Questions ==
++
++= Will this affect existing orders? =
++
++No. The plugin only auto-completes orders placed after activation. You can use the bulk action feature to retroactively complete existing qualifying orders.
++
++= Does it work with all payment gateways? =
++
++Yes. All standard WooCommerce payment gateways are supported. You can optionally restrict auto-completion to specific gateways in the settings.
++
++= What happens if I deactivate the plugin? =
++
++Auto-completion stops immediately. All order statuses remain as they were. Your settings are preserved and will resume if you reactivate.
++
++= Is it compatible with WooCommerce Subscriptions? =
++
++The plugin checks product types on a per-item basis. Subscription products are not virtual/downloadable in the traditional sense, so they will not trigger auto-completion by default unless explicitly configured.
++
++== Screenshots ==
++
++1. Plugin settings page — configure triggers, payment methods, and exclusions.
++2. Per-product meta box — disable auto-complete on individual products.
++3. Bulk action on Orders screen — complete or skip auto-complete for multiple orders.
++
++== Changelog ==
++
++See changelog.txt for full version history.
++
++= 1.0.0 =
++* Initial release
++* Smart auto-complete for virtual/downloadable orders
++* Payment method filtering
+… omitted 9 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/changelog.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-auto-complete/changelog.txt
+@@ -0,0 +1,12 @@
++= 1.0.0 — June 2026 =
++* Initial public release
++* Feature: Smart auto-complete for virtual/downloadable WooCommerce orders
++* Feature: Payment method filtering — restrict auto-complete to specific gateways
++* Feature: Per-product disable toggle via meta box on product edit screen
++* Feature: Category exclusion rules
++* Feature: Bulk "Auto-Complete Orders" and "Un-Auto-Complete Orders" actions on the Orders list table
++* Feature: Toggle for sending the WooCommerce "Order Completed" email to customers
++* Feature: Clean, native WordPress/WooCommerce settings page
++* Feature: Full uninstall cleanup (options + post meta)
++* Dev: PHP 7.4+ compatible, WordPress 5.0+, WooCommerce 4.0+
++* Dev: WordPress coding standards, proper escaping, nonce verification throughout
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/progress.json → b//opt/data/sandy_ops/gumroad-store/progress.json
+@@ -0,0 +1 @@
++{"completed": ["woocommerce-auto-complete"], "current": "woocommerce-custom-badges", "bundles_done": false}
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/woocommerce-custom-badges.php → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/woocommerce-custom-badges.php
+@@ -0,0 +1,690 @@
++<?php
++/**
++ * Plugin Name:       WooCommerce Custom Product Badges
++ * Plugin URI:        https://sandydigital.io
++ * Description:       Add eye-catching "Sale", "New", "Featured", and custom badges to your WooCommerce products. Color picker, scheduling, and per-product overrides.
++ * Version:           1.0.0
++ * Author:            Sandy Digital
++ * Author URI:        https://sandydigital.io
++ * License:           GPL-2.0+
++ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
++ * Text Domain:       wc-custom-badges
++ * Domain Path:       /languages
++ * Requires at least: 5.0
++ * Requires PHP:      7.4
++ * WC requires at least: 4.0
++ * WC tested up to:   9.0
++ *
++ * @package WC_Custom_Badges
++ */
++
++if ( ! defined( 'ABSPATH' ) ) {
++	exit;
++}
++
++if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
++	return;
++}
++
++final class WC_Custom_Badges {
++
++	private static $instance = null;
++
++	const OPTION_KEY = 'wc_custom_badges_settings';
++	const META_DISABLE  = '_wc_badge_disable';
++	const META_TYPE     = '_wc_badge_type';
++	const META_TEXT     = '_wc_badge_text';
++	const META_COLOR    = '_wc_badge_color';
++	const META_START    = '_wc_badge_start_date';
++	const META_EXPIRY   = '_wc_badge_expiry_date';
++
++	public static function instance() {
++		if ( null === self::$instance ) {
++			self::$instance = new self();
++		}
++		return self::$instance;
++	}
++
++	private function __construct() {
++		add_action( 'init', array( $this, 'load_textdomain' ) );
++		add_action( 'woocommerce_before_shop_loop_item_title', array( $this, 'render_badge_loop' ), 10 );
++		add_action( 'woocommerce_before_single_product_summary', array( $this, 'render_badge_single' ), 10 );
++		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
++		add_action( 'admin_init', array( $this, 'register_settings' ) );
++		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
++		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
++		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
++		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
++		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
++	}
++
++	public function load_textdomain() {
++		load_plugin_textdomain( 'wc-custom-badges', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
++	}
++
++	private function defaults() {
++		return array(
++			'sale_enabled'       => 'yes',
++			'sale_text'          => 'Sale!',
++			'sale_bg_color'      => '#e74c3c',
++			'sale_text_color'    => '#ffffff',
++
++			'new_enabled'        => 'yes',
++			'new_text'           => 'New',
++			'new_bg_color'       => '#2ecc71',
++			'new_text_color'     => '#ffffff',
++			'new_duration_days'  => 30,
++
++			'featured_enabled'   => 'yes',
+… omitted 612 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/README.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/README.txt
+@@ -0,0 +1,73 @@
++=== WooCommerce Custom Product Badges ===
++Contributors: sandydigital
++Tags: woocommerce, product badges, sale badge, new badge, featured badge, labels
++Requires at least: 5.0
++Tested up to: 6.5
++Requires PHP: 7.4
++Stable tag: 1.0.0
++License: GPL-2.0+
++License URI: https://www.gnu.org/licenses/gpl-2.0.html
++
++Add eye-catching "Sale", "New", "Featured", and custom badges to your WooCommerce products. Full color control, scheduling, and per-product overrides.
++
++== Description ==
++
++WooCommerce Custom Product Badges adds beautiful, customizable badges to your product images on both shop/loop pages and single product pages.
++
++= Key Features =
++
++* **4 Badge Types** — Sale (auto-detects products on sale), New (auto-detects recently published products), Featured (for featured products), and Custom (manual assignment).
++* **Full Color Control** — Built-in WordPress color picker for each badge's background and text color. Match your brand perfectly.
++* **5 Position Options** — Top left, top right, bottom left, bottom right, or center. Choose where badges appear on product images.
++* **Smart Priority System** — Badges display in priority order: Sale > New > Featured > Custom. Only one badge shows per product.
++* **"New" Duration** — Set how many days a product is considered "New" after publishing (default: 30 days).
++* **Per-Product Override** — Assign any badge type (or no badge) to individual products. Override text, color, start date, and expiry date.
++* **Scheduled Badges** — Set start dates and expiry dates for per-product badges. Run a flash sale badge for the weekend.
++* **Zero Performance Impact** — Lightweight CSS-only positioning. No JavaScript on the frontend.
++* **Uninstall Cleanup** — Removes all options and post meta on uninstall.
++
++= How It Works =
++
++1. Install and activate. Badges appear immediately with sensible defaults.
++2. Go to WooCommerce → Product Badges to customize colors, text, position, and sizing.
++3. For per-product control, edit any product and use the "Product Badge Override" meta box.
++4. That's it — badges render automatically on shop and product pages.
++
++== Installation ==
++
++1. Upload `woocommerce-custom-badges.php` to `/wp-content/plugins/`.
++2. Activate the plugin through the WordPress 'Plugins' menu.
++3. Go to WooCommerce → Product Badges to customize.
++4. Badges appear instantly.
++
++== Frequently Asked Questions ==
++
++= Will this work with my theme? =
++
++Yes. The plugin uses absolute positioning with a z-index of 10, which works with virtually all WooCommerce themes. If your theme uses custom product image markup, you may need minor CSS adjustments.
++
++= Can I show multiple badges at once? =
++
++By design, only one badge renders per product (priority-based). This keeps your product images clean and avoids badge clutter. You can use per-product overrides to pick which badge shows.
++
++= Do badges appear on archive/shop pages? =
++
++Yes — badges render on the shop page, category pages, tag pages, and single product pages.
++
++== Screenshots ==
++
++1. Badges on shop page — Sale, New, and Featured badges in action.
++2. Plugin settings page — Color pickers, position selector, and badge configuration.
++3. Per-product override meta box — Custom badge, date scheduling, and disable toggle.
++
++== Changelog ==
++
++See changelog.txt.
++
++= 1.0.0 =
++* Initial release
++* 4 badge types: Sale, New, Featured, Custom
++* Color picker for each badge
++* 5 position options
++* Per-product override with scheduling
++* Uninstall cleanup
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/changelog.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-custom-badges/changelog.txt
+@@ -0,0 +1,17 @@
++= 1.0.0 — June 2026 =
++* Initial public release
++* Feature: Sale badge — auto-detects products on sale using woocommerce_before_shop_loop_item_title and woocommerce_before_single_product_summary hooks
++* Feature: New badge — auto-detects recently published products with configurable "new" duration in days
++* Feature: Featured badge — detects WooCommerce featured products
++* Feature: Custom badge — manually assigned per-product badge with any text and color
++* Feature: WordPress color picker integration for badge background and text colors
++* Feature: 5 position options: top-left, top-right, bottom-left, bottom-right, center
++* Feature: Priority-based badge system — only one badge renders per product (Sale > New > Featured > Custom)
++* Feature: Per-product override meta box — assign badge type, custom text, color, start date, and expiry date
++* Feature: Date-based scheduling — badges can have optional start date and expiry date
++* Feature: Per-product disable toggle
++* Feature: Configurable font size and border radius
++* Feature: Lightweight, CSS-only frontend — zero JavaScript on customer-facing pages
++* Feature: Full uninstall cleanup (options + all post meta)
++* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
++* Dev: WordPress coding standards, proper escaping (esc_html, esc_attr, sanitize_hex_color), nonce verification
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/progress.json → b//opt/data/sandy_ops/gumroad-store/progress.json
+@@ -1 +1 @@
+-{"completed": ["woocommerce-auto-complete"], "current": "woocommerce-custom-badges", "bundles_done": false}+{"completed": ["woocommerce-auto-complete", "woocommerce-custom-badges"], "current": "woocommerce-stock-alerts", "bundles_done": false}
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/woocommerce-stock-alerts.php → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/woocommerce-stock-alerts.php
+@@ -0,0 +1,908 @@
++<?php
++/**
++ * Plugin Name:       WooCommerce Stock Alert System
++ * Plugin URI:        https://sandydigital.io
++ * Description:       Low stock email notifications for WooCommerce. Per-product thresholds, multiple recipients, daily digest, and breach logging.
++ * Version:           1.0.0
++ * Author:            Sandy Digital
++ * Author URI:        https://sandydigital.io
++ * License:           GPL-2.0+
++ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
++ * Text Domain:       wc-stock-alerts
++ * Domain Path:       /languages
++ * Requires at least: 5.0
++ * Requires PHP:      7.4
++ * WC requires at least: 4.0
++ * WC tested up to:   9.0
++ *
++ * @package WC_Stock_Alerts
++ */
++
++if ( ! defined( 'ABSPATH' ) ) {
++	exit;
++}
++
++if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
++	return;
++}
++
++final class WC_Stock_Alerts {
++
++	private static $instance = null;
++
++	const OPTION_KEY      = 'wc_stock_alerts_settings';
++	const META_THRESHOLD  = '_wc_stock_alert_threshold';
++	const META_DISABLE    = '_wc_stock_alert_disable';
++	const LOG_TABLE       = 'wc_stock_alert_log';
++
++	/** @var array Cache of already-sent alerts this request to prevent duplicates. */
++	private $sent_this_request = array();
++
++	public static function instance() {
++		if ( null === self::$instance ) {
++			self::$instance = new self();
++		}
++		return self::$instance;
++	}
++
++	private function __construct() {
++		add_action( 'init', array( $this, 'load_textdomain' ) );
++		add_action( 'init', array( $this, 'maybe_create_log_table' ) );
++
++		// Core triggers.
++		add_action( 'woocommerce_reduce_order_stock', array( $this, 'on_reduce_stock' ) );
++		add_action( 'woocommerce_product_set_stock_status', array( $this, 'on_stock_status_change' ), 10, 3 );
++		add_action( 'woocommerce_product_set_stock', array( $this, 'on_stock_quantity_set' ) );
++		add_action( 'woocommerce_variation_set_stock', array( $this, 'on_variation_stock_set' ) );
++
++		// Admin.
++		add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
++		add_action( 'admin_init', array( $this, 'register_settings' ) );
++		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
++		add_action( 'save_post', array( $this, 'save_product_meta_box' ) );
++
++		// Product list column.
++		add_filter( 'manage_edit-product_columns', array( $this, 'add_stock_alert_column' ) );
++		add_action( 'manage_product_posts_custom_column', array( $this, 'render_stock_alert_column' ), 10, 2 );
++
++		// Daily digest cron.
++		add_action( 'wc_stock_alerts_daily_digest', array( $this, 'send_daily_digest' ) );
++		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
++
++		// Activation hook.
++		register_activation_hook( __FILE__, array( $this, 'activate' ) );
++	}
++
++	public function load_textdomain() {
++		load_plugin_textdomain( 'wc-stock-alerts', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
++	}
+… omitted 830 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/README.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/README.txt
+@@ -0,0 +1,75 @@
++=== WooCommerce Stock Alert System ===
++Contributors: sandydigital
++Tags: woocommerce, stock alerts, low stock, inventory, email notifications, back in stock
++Requires at least: 5.0
++Tested up to: 6.5
++Requires PHP: 7.4
++Stable tag: 1.0.0
++License: GPL-2.0+
++License URI: https://www.gnu.org/licenses/gpl-2.0.html
++
++Get instant email notifications when WooCommerce products run low on stock. Per-product thresholds, multiple recipients, daily digest emails, and a breach audit log.
++
++== Description ==
++
++Never run out of stock without knowing it. WooCommerce Stock Alert System monitors your inventory in real time and sends email notifications the moment a product's stock falls to or below your defined threshold.
++
++= Key Features =
++
++* **Real-Time Alerts** — Instant email when stock drops below threshold (triggered on order, manual stock change, or status change).
++* **Per-Product Thresholds** — Set a global default, then override it for high-priority products that need more buffer.
++* **Multiple Recipients** — Comma-separated list of email addresses. CC your warehouse manager, assistant, and yourself.
++* **Daily Digest** — One summary email per day listing every product that's below threshold. Silent when everything is healthy.
++* **Out-of-Stock Alerts** — Optional instant notification when a product goes completely out of stock.
++* **Breach Audit Log** — Every alert is recorded in a database table. View, search, and clear the log from the WordPress admin.
++* **Admin Column** — See stock alert status at a glance on the Products list table. ⚠ for low, ✓ for healthy.
++* **Smart Deduplication** — No duplicate alerts in the same request, even if multiple hooks fire.
++* **Uninstall Cleanup** — Removes options, post meta, scheduled cron, and the log table on uninstall.
++
++= How It Works =
++
++1. Set a global threshold (e.g., 5).
++2. When stock for any product drops to 5 or below, an email fires to all recipients.
++3. Optionally, receive a daily digest summarizing all products below threshold.
++4. Review alerts in the Stock Alert Log at WooCommerce → Stock Alert Log.
++
++= Triggers Covered =
++
++* Customer places an order (stock reduced)
++* Admin manually changes stock quantity
++* Stock status changes (in stock → out of stock)
++* Variation stock changes for variable products
++
++== Installation ==
++
++1. Upload `woocommerce-stock-alerts.php` to `/wp-content/plugins/`.
++2. Activate the plugin.
++3. Go to WooCommerce → Stock Alerts to set your threshold and recipients.
++4. The log table is created automatically on activation.
++
++== Frequently Asked Questions ==
++
++= Will this send too many emails? =
++
++No. The plugin deduplicates within a single request and the daily digest only sends if at least one product is below threshold. You can also disable instant alerts per product.
++
++= Does it work with variable products? =
++
++Yes. Each variation's stock is checked independently. The alert identifies the parent product and the specific variation attributes.
++
++= What happens on uninstall? =
++
++Everything is removed: the options, per-product meta, scheduled cron, and the log table. Zero traces left.
++
++== Screenshots ==
++
++1. Settings page — global threshold, recipients, email templates, digest toggle.
++2. Per-product meta box — custom threshold and disable toggle.
++3. Breach log page — audit trail of every alert with product links.
++
++== Changelog ==
++
++See changelog.txt.
++
++= 1.0.0 =
++* Initial release
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/changelog.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-stock-alerts/changelog.txt
+@@ -0,0 +1,20 @@
++= 1.0.0 — June 2026 =
++* Initial public release
++* Feature: Real-time email alerts when product stock drops below configurable threshold
++* Feature: Per-product custom threshold — override the global default for specific products
++* Feature: Multiple recipient support — comma-separated email list
++* Feature: Daily digest email summarizing all products below threshold (silent when healthy)
++* Feature: Out-of-stock instant alerts (optional toggle)
++* Feature: Breach audit log stored in custom database table (wc_stock_alert_log)
++* Feature: Log viewer page at WooCommerce → Stock Alert Log with pagination and clear action
++* Feature: Admin products list column showing stock alert status (⚠ low / ✓ healthy / OUT)
++* Feature: Per-product disable toggle in meta box
++* Feature: Customizable email subject and heading with {site_name} and {product_name} placeholders
++* Feature: HTML email format with styled product links
++* Feature: Smart deduplication — prevents duplicate alerts within same request
++* Feature: Covers 4 trigger points: order stock reduction, stock status change, stock quantity set, variation stock set
++* Feature: Variable product support — checks each variation independently with attribute labels
++* Feature: Cron-based daily digest with configurable schedule (default: 8 AM)
++* Feature: Full uninstall cleanup — drops log table, removes options, post meta, and cron
++* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
++* Dev: WordPress coding standards, proper escaping, nonce verification, dbDelta for table creation
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/README.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/README.txt
+@@ -0,0 +1,68 @@
++=== WooCommerce Custom Checkout Fields Manager ===
++Contributors: sandydigital
++Tags: woocommerce, checkout fields, custom fields, checkout, drag drop, field manager
++Requires at least: 5.0
++Tested up to: 6.5
++Requires PHP: 7.4
++Stable tag: 1.0.0
++License: GPL-2.0+
++License URI: https://www.gnu.org/licenses/gpl-2.0.html
++
++Add, reorder, hide, and manage custom checkout fields on your WooCommerce checkout page. Drag-and-drop reorder, conditional display, 9 field types, and validation — no coding required.
++
++== Description ==
++
++WooCommerce Custom Checkout Fields Manager gives you full control over your checkout form. Reorder billing and shipping fields via drag-and-drop, add custom fields of any type, apply conditional logic, and validate input — all from a clean admin interface.
++
++= Key Features =
++
++* **Drag-and-Drop Reorder** — Rearrange billing, shipping, and order fields by dragging. Changes apply instantly to your checkout page.
++* **9 Field Types** — Text, Email, Phone, Number, Textarea, Select Dropdown, Radio Buttons, Checkbox, and Date Picker.
++* **Custom Fields** — Add unlimited custom fields to Billing, Shipping, or Order sections. Fully editable and deletable.
++* **Built-in Field Control** — Hide any default WooCommerce field (e.g., remove Company Name or Address Line 2). Reorder built-in fields alongside your custom ones.
++* **Conditional Display** — Show/hide fields based on the value of another field. Show "Delivery Instructions" only when "Ship to different address" is checked.
++* **Validation Rules** — Email format, phone format, numeric range (min/max), and custom regex patterns with custom error messages.
++* **Required/Optional Toggle** — Make any field required or optional per field.
++* **Order & Email Integration** — Custom field values appear in the admin order screen, thank-you page, and order confirmation emails.
++* **Priority-Based Sorting** — Each field has a numeric priority. Drag-and-drop updates priorities automatically.
++* **Zero Code Required** — Everything managed through the WordPress admin at WooCommerce → Checkout Fields.
++
++= How It Works =
++
++1. Go to WooCommerce → Checkout Fields Manager.
++2. Drag fields to reorder them. Hide fields you don't need.
++3. Add custom fields with the form at the bottom.
++4. Changes apply instantly to your store's checkout page.
++
++== Installation ==
++
++1. Upload `woocommerce-checkout-fields.php` to `/wp-content/plugins/`.
++2. Activate through WordPress Plugins screen.
++3. Go to WooCommerce → Checkout Fields to start managing.
++
++== Frequently Asked Questions ==
++
++= Will this break my checkout page? =
++
++No. The plugin hooks into WooCommerce's native `woocommerce_checkout_fields` filter and follows WordPress/WooCommerce standards. Deactivating the plugin restores the default checkout layout.
++
++= Does it work with custom themes? =
++
++Yes. The plugin modifies the field array that WooCommerce renders. As long as your theme uses the standard WooCommerce checkout hooks, everything works.
++
++= What happens to saved custom field data on uninstall? =
++
++The plugin configuration is removed, but custom field values saved to orders remain in the order meta.
++
++== Screenshots ==
++
++1. Drag-and-drop field manager — reorder billing, shipping, and order fields with visual drag handles.
++2. Add custom field form — choose type, section, label, and validation rules.
++3. Checkout page showing custom fields in action.
++
++== Changelog ==
++
++See changelog.txt.
++
++= 1.0.0 =
++* Initial release
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/changelog.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/changelog.txt
+@@ -0,0 +1,22 @@
++= 1.0.0 — June 2026 =
++* Initial public release
++* Feature: Drag-and-drop field reordering with jQuery UI Sortable for billing, shipping, and order sections
++* Feature: 9 field types: Text, Email, Phone, Number, Textarea, Select Dropdown, Radio Buttons, Checkbox, Date Picker
++* Feature: Add unlimited custom fields to any checkout section (billing, shipping, order)
++* Feature: Built-in field control — hide, reorder, and manage all default WooCommerce checkout fields
++* Feature: Conditional display logic — show/hide fields based on other field values (equals, not_equals, contains, empty, not_empty)
++* Feature: Validation rule system — email, phone, numeric range (min/max), and custom regex with custom error messages
++* Feature: Required/optional toggle per field
++* Feature: Custom field values displayed in admin order screen (after billing address)
++* Feature: Custom field values displayed on thank-you page
++* Feature: Custom field values included in WooCommerce order confirmation emails (admin + customer)
++* Feature: AJAX delete for custom fields with nonce verification
++* Feature: AJAX save order for drag-and-drop with nonce verification
++* Feature: Priority-based sorting — each field gets numeric priority updated on reorder
++* Feature: Visual badges for Required, Hidden, Custom, and Conditional fields in admin
++* Feature: Section collapsible headers in admin with field counts
++* Feature: Option parsing for select/radio fields (value|label format, one per line)
++* Feature: Bulk field reordering across all sections
++* Feature: Uninstall cleanup — removes plugin options, preserves order meta
++* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
++* Dev: WordPress coding standards, proper escaping, nonce verification, sanitize_key for field keys
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/woocommerce-wholesale-pricing.php → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/woocommerce-wholesale-pricing.php
+@@ -0,0 +1,1003 @@
++<?php
++/**
++ * Plugin Name:       WooCommerce Wholesale Pricing
++ * Plugin URI:        https://sandydigital.io
++ * Description:       Role-based wholesale pricing with quantity breaks, minimum orders, and price hiding. Perfect for B2B stores.
++ * Version:           1.0.0
++ * Author:            Sandy Digital
++ * Author URI:        https://sandydigital.io
++ * License:           GPL-2.0+
++ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
++ * Text Domain:       wc-wholesale-pricing
++ * Domain Path:       /languages
++ * Requires at least: 5.0
++ * Requires PHP:      7.4
++ * WC requires at least: 4.0
++ * WC tested up to:   9.0
++ *
++ * @package WC_Wholesale_Pricing
++ */
++
++if ( ! defined( 'ABSPATH' ) ) {
++	exit;
++}
++
++if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
++	return;
++}
++
++final class WC_Wholesale_Pricing {
++
++	private static $instance = null;
++
++	const OPTION_KEY     = 'wc_wholesale_settings';
++	const META_PRICE     = '_wc_wholesale_price';
++	const META_QTY_RULES = '_wc_wholesale_qty_rules';
++	const META_MIN_QTY   = '_wc_wholesale_min_qty';
++	const META_DISABLE   = '_wc_wholesale_disable';
++
++	/** @var array|null Cached current user roles. */
++	private $user_roles = null;
++
++	/** @var string|null Cached matched wholesale role. */
++	private $wholesale_role = null;
++
++	public static function instance() {
++		if ( null === self::$instance ) {
++			self::$instance = new self();
++		}
++		return self::$instance;
++	}
++
++	private function __construct() {
++		add_action( 'init', array( $this, 'load_textdomain' ) );
++
++		// Price hooks.
++		add_filter( 'woocommerce_product_get_price', array( $this, 'filter_price' ), 99, 2 );
++		add_filter( 'woocommerce_product_get_regular_price', array( $this, 'filter_price' ), 99, 2 );
++		add_filter( 'woocommerce_product_get_sale_price', array( $this, 'filter_sale_price' ), 99, 2 );
++		add_filter( 'woocommerce_product_variation_get_price', array( $this, 'filter_price' ), 99, 2 );
++		add_filter( 'woocommerce_product_variation_get_regular_price', array( $this, 'filter_price' ), 99, 2 );
++		add_filter( 'woocommerce_variation_prices_price', array( $this, 'filter_variation_price' ), 99, 3 );
++		add_filter( 'woocommerce_variation_prices_regular_price', array( $this, 'filter_variation_price' ), 99, 3 );
++		add_filter( 'woocommerce_get_price_html', array( $this, 'filter_price_html' ), 99, 2 );
++
++		// Add to cart validation (minimum order).
++		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_min_qty' ), 99, 3 );
++		add_filter( 'woocommerce_update_cart_validation', array( $this, 'validate_min_qty_update' ), 99, 4 );
++		add_action( 'woocommerce_check_cart_items', array( $this, 'check_cart_quantities' ) );
++
++		// Cart price recalculation.
++		add_action( 'woocommerce_before_calculate_totals', array( $this, 'recalculate_cart_prices' ), 99 );
++
++		// Admin.
++		add_action( 'admin_menu', array( $this, 'add_admin_page' ) );
++		add_action( 'admin_init', array( $this, 'register_settings' ) );
++		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
++		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
++		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+… omitted 925 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/README.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/README.txt
+@@ -0,0 +1,82 @@
++=== WooCommerce Wholesale Pricing ===
++Contributors: sandydigital
++Tags: woocommerce, wholesale, b2b, role-based pricing, quantity discounts, tiered pricing
++Requires at least: 5.0
++Tested up to: 6.5
++Requires PHP: 7.4
++Stable tag: 1.0.0
++License: GPL-2.0+
++License URI: https://www.gnu.org/licenses/gpl-2.0.html
++
++Role-based wholesale pricing with quantity breaks, minimum order enforcement, and price hiding. Turn your WooCommerce store into a B2B powerhouse.
++
++== Description ==
++
++WooCommerce Wholesale Pricing brings enterprise-level B2B features to your WooCommerce store. Assign role-based discounts, set quantity break tiers, enforce minimum orders, and hide prices from guests — all from a clean admin interface.
++
++= Key Features =
++
++* **Role-Based Pricing** — Assign different discount percentages or fixed amounts per WordPress user role. Wholesale Customer gets 30% off, VIP gets 40% off. You control who sees what.
++* **Quantity Break Tiers** — Progressive discounts based on quantity. "Buy 10+ → 20% off. Buy 50+ → 35% off. Buy 100+ → $8.50 each." Fully configurable per product.
++* **Per-Product Override** — Set a fixed wholesale price on any product that overrides all role and tier discounts. Your bestseller at an exact price point.
++* **Minimum Order Quantity** — Enforce minimum purchase quantities per product for wholesale customers. Prevent single-unit wholesale orders.
++* **Price Hiding** — Hide all prices and Add to Cart buttons from logged-out visitors. Perfect for private wholesale catalogs.
++* **Retail Price Display** — Show the original retail price with a strikethrough next to the wholesale price. Customers see exactly what they're saving.
++* **Custom Price Labels** — Each role gets a custom label (e.g., "Wholesale", "VIP", "Dealer") displayed next to prices.
++* **Variable Product Support** — Wholesale pricing applies to each variation independently with per-variation filters.
++* **Cart Recalculation** — Prices are recalculated in the cart based on quantity tiers. Add 1 item at regular wholesale, add 50 and the tier kicks in.
++* **Full Admin Column** — See wholesale pricing status at a glance on the Products list.
++* **Uninstall Cleanup** — Removes all options and post meta.
++
++= How It Works =
++
++1. Create wholesale user roles (e.g., "Wholesale Customer", "Wholesale VIP") under Users.
++2. Assign customers to those roles.
++3. Configure discounts per role at WooCommerce → Wholesale Pricing.
++4. Set per-product overrides, quantity tiers, and minimums on each product.
++5. Logged-in wholesale customers see discounted prices automatically.
++
++= Pricing Logic (Priority Order) =
++
++1. Per-product fixed wholesale price (overrides everything)
++2. Quantity break tier match (quantity in cart determines tier)
++3. Role-based percentage or fixed discount
++
++== Installation ==
++
++1. Upload `woocommerce-wholesale-pricing.php` to `/wp-content/plugins/`.
++2. Activate through WordPress Plugins screen.
++3. Create wholesale roles under Users → Add New Role (or use a role editor plugin).
++4. Go to WooCommerce → Wholesale Pricing to configure.
++5. Assign customers to wholesale roles on their user profiles.
++
++== Frequently Asked Questions ==
++
++= Do I need a role editor plugin? =
++
++WordPress doesn't have a built-in role editor, so you'll need one (e.g., User Role Editor, Members, or custom code). Create roles like "wholesale_customer" and "wholesale_vip", then configure them in the plugin settings.
++
++= Will retail customers see wholesale prices? =
++
++No. Only logged-in users with the configured wholesale roles see discounted prices. Retail customers and guests continue to see standard pricing.
++
++= What happens if a wholesale user logs out? =
++
++They immediately see retail prices (or the "login to see prices" message if price hiding is enabled).
++
++= Does it work with WooCommerce Subscriptions? =
++
++Yes. The plugin hooks into core WooCommerce price filters, so subscription products are supported.
++
++== Screenshots ==
++
++1. Role settings — configure discount type, value, and label per role.
++2. Per-product meta box — fixed price, quantity tiers, and minimum order.
++3. Frontend — wholesale price with strikethrough retail price and role label.
++
++== Changelog ==
++
+… omitted 4 diff line(s) across 1 additional file(s)/section(s)
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/changelog.txt → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-wholesale-pricing/changelog.txt
+@@ -0,0 +1,26 @@
++= 1.0.0 — June 2026 =
++* Initial public release
++* Feature: Role-based wholesale pricing — percentage or fixed discount per WordPress user role
++* Feature: Two pre-configured role slots: Wholesale Customer and Wholesale VIP (editable via settings)
++* Feature: Quantity break tiers per product — progressive discounts at configurable quantity thresholds
++* Feature: Tier types: percentage off or fixed price per unit
++* Feature: Dynamic tier matching based on cart quantity at recalculation time
++* Feature: Per-product fixed wholesale price — overrides all role and quantity discounts
++* Feature: Per-product minimum order quantity enforcement for wholesale customers
++* Feature: Global minimum order quantity setting with per-product override
++* Feature: Validate minimum quantity on add-to-cart, cart update, and before checkout
++* Feature: Price hiding from logged-out guests — prices replaced with configurable login message
++* Feature: Optional Add to Cart button removal for guests (requires price hiding enabled)
++* Feature: Retail price strikethrough display — shows original retail price crossed out next to wholesale price
++* Feature: Custom price labels per role (e.g. "Wholesale", "VIP", "Dealer")
++* Feature: Automatic cart price recalculation on woocommerce_before_calculate_totals
++* Feature: Variable product support via woocommerce_variation_prices_price and per-variation get_price filters
++* Feature: Admin products list column showing wholesale pricing status (fixed price, tier count, or role discount %)
++* Feature: Per-product disable toggle in meta box
++* Feature: Dynamic quantity tier UI — add/remove tiers in product meta box via JavaScript
++* Feature: Price filter priority system: fixed price > quantity tiers > role discount
++* Feature: Wholesale overrides sale price for wholesale users
++* Feature: Admin-only pricing preservation — wholesale prices not applied in wp-admin (except AJAX cart operations)
++* Feature: Full uninstall cleanup — options and all post meta removed
++* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
++* Dev: WordPress coding standards, proper escaping, nonce verification, sanitize_text_field
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/progress.json → b//opt/data/sandy_ops/gumroad-store/progress.json
+@@ -1,12 +1 @@
+-{
+-  "completed": [
+-    "product1-woo-order-auto-complete",
+-    "product3-woo-stock-alert-system",
+-    "product5-woo-wholesale-pricing",
+-    "bundle-store-manager-pack"
+-  ],
+-  "current": null,
+-  "bundles_done": true,
+-  "last_updated": "2026-06-06T04:56:00Z",
+-  "note": "Store Manager Pack bundle (products 1,3,5) created at $59. Individual products listed at their respective prices. All are draft listings."
+-}
++{"completed": ["woocommerce-auto-complete", "woocommerce-custom-badges", "woocommerce-stock-alerts", "woocommerce-checkout-fields", "woocommerce-wholesale-pricing"], "current": "gumroad-listings", "bundles_done": false, "gumroad_created": 2, "gumroad_pending": ["woocommerce-stock-alerts", "woocommerce-checkout-fields", "woocommerce-wholesale-pricing", "bundle-essential-pack", "bundle-store-manager"]}
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/woocommerce-checkout-fields.php → b//opt/data/sandy_ops/gumroad-store/products/woocommerce-checkout-fields/woocommerce-checkout-fields.php
+@@ -0,0 +1,875 @@
++<?php
++/**
++ * Plugin Name:       WooCommerce Custom Checkout Fields Manager
++ * Plugin URI:        https://sandydigital.io
++ * Description:       Add, reorder, and manage custom checkout fields on your WooCommerce checkout page. Drag-drop ordering, conditional display, multiple field types, and validation — no coding required.
++ * Version:           1.0.0
++ * Author:            Sandy Digital
++ * Author URI:        https://sandydigital.io
++ * License:           GPL-2.0+
++ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
++ * Text Domain:       wc-checkout-fields
++ * Domain Path:       /languages
++ * Requires at least: 5.0
++ * Requires PHP:      7.4
++ * WC requires at least: 4.0
++ * WC tested up to:   9.0
++ *
++ * @package WC_Checkout_Fields
++ */
++
++if ( ! defined( 'ABSPATH' ) ) {
++	exit;
++}
++
++if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
++	return;
++}
++
++final class WC_Checkout_Fields_Manager {
++
++	private static $instance = null;
++
++	const OPTION_KEY = 'wc_checkout_fields_data';
++
++	/** @var array Built-in default fields. */
++	private $default_fields;
++
++	public static function instance() {
++		if ( null === self::$instance ) {
++			self::$instance = new self();
++		}
++		return self::$instance;
++	}
++
++	private function __construct() {
++		add_action( 'init', array( $this, 'load_textdomain' ) );
++
++		// Frontend hooks.
++		add_filter( 'woocommerce_checkout_fields', array( $this, 'modify_checkout_fields' ), 99 );
++		add_action( 'woocommerce_checkout_process', array( $this, 'validate_custom_fields' ) );
++		add_action( 'woocommerce_checkout_update_order_meta', array( $this, 'save_custom_fields' ) );
++		add_action( 'woocommerce_admin_order_data_after_billing_address', array( $this, 'display_custom_fields_admin' ) );
++		add_action( 'woocommerce_order_details_after_customer_details', array( $this, 'display_custom_fields_thankyou' ) );
++
++		// Email integration.
++		add_filter( 'woocommerce_email_order_meta_fields', array( $this, 'add_fields_to_email' ), 10, 3 );
++
++		// Admin.
++		add_action( 'admin_menu', array( $this, 'add_admin_page' ) );
++		add_action( 'admin_init', array( $this, 'handle_form_submission' ) );
++		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
++		add_action( 'wp_ajax_wc_cf_save_order', array( $this, 'ajax_save_order' ) );
++		add_action( 'wp_ajax_wc_cf_delete_field', array( $this, 'ajax_delete_field' ) );
++
++		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
++	}
++
++	public function load_textdomain() {
++		load_plugin_textdomain( 'wc-checkout-fields', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
++	}
++
++	// ─── Defaults ───────────────────────────────────────────
++
++	private function get_default_fields() {
++		if ( null !== $this->default_fields ) {
++			return $this->default_fields;
++		}
++
+… omitted 797 diff line(s) across 1 additional file(s)/section(s)
+Both P1 and P2 confirmed EXISTING on Gumroad. The GET /products endpoint has display issues but individual lookups work. Here's the final comprehensive status.
+
+session_id: 20260606_005545_ef0c4e
