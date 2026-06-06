@@ -1,0 +1,12 @@
+= 1.0.0 — June 2026 =
+* Initial public release
+* Feature: Smart auto-complete for virtual/downloadable WooCommerce orders
+* Feature: Payment method filtering — restrict auto-complete to specific gateways
+* Feature: Per-product disable toggle via meta box on product edit screen
+* Feature: Category exclusion rules
+* Feature: Bulk "Auto-Complete Orders" and "Un-Auto-Complete Orders" actions on the Orders list table
+* Feature: Toggle for sending the WooCommerce "Order Completed" email to customers
+* Feature: Clean, native WordPress/WooCommerce settings page
+* Feature: Full uninstall cleanup (options + post meta)
+* Dev: PHP 7.4+ compatible, WordPress 5.0+, WooCommerce 4.0+
+* Dev: WordPress coding standards, proper escaping, nonce verification throughout
