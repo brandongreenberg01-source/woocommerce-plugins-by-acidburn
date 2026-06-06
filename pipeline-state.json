@@ -1,0 +1,92 @@
+{
+  "plugins": {
+    "woocommerce-auto-complete": {
+      "name": "WooCommerce Order Auto-Complete",
+      "slug": "woo-order-auto-complete",
+      "price": 2900,
+      "status": "listing",
+      "author": "Brandon Greenberg",
+      "files": ["plugins/woocommerce-auto-complete/woocommerce-auto-complete.php"],
+      "research": {"completed": true, "competitors_found": 0, "review_insights": ["No direct competitors on Gumroad"]},
+      "triad": {"passed": true, "last_run": "2026-06-06T00:30:00-04:00", "issues": [], "fixes_applied": true},
+      "gumroad_id": null,
+      "listed_at": null,
+      "cron_job_id": "6bc2e0843101"
+    },
+    "woocommerce-custom-badges": {
+      "name": "WooCommerce Custom Product Badges",
+      "slug": "woo-custom-badges",
+      "price": 2900,
+      "status": "verified",
+      "author": "Brandon Greenberg",
+      "files": ["plugins/woocommerce-custom-badges/woocommerce-custom-badges.php"],
+      "research": {"completed": true, "competitors_found": 0, "review_insights": ["Only 1 product found — unrelated FOMO tool"]},
+      "triad": {"passed": true, "last_run": "2026-06-06T00:30:00-04:00", "issues": [], "fixes_applied": true},
+      "gumroad_id": null,
+      "listed_at": null
+    },
+    "woocommerce-stock-alerts": {
+      "name": "WooCommerce Stock Alert System",
+      "slug": "woo-stock-alert-system",
+      "price": 3900,
+      "status": "draft",
+      "author": "Brandon Greenberg",
+      "files": ["plugins/woocommerce-stock-alerts/woocommerce-stock-alerts.php"],
+      "research": {"completed": true, "competitors_found": 0, "review_insights": ["ZERO products found — completely uncontested"]},
+      "triad": {"passed": true, "last_run": "2026-06-06T00:30:00-04:00", "issues": [], "fixes_applied": true},
+      "gumroad_id": "7UbZaP1LilMcwmq_lpYTNQ==",
+      "listed_at": null
+    },
+    "woocommerce-checkout-fields": {
+      "name": "WooCommerce Custom Checkout Fields Manager",
+      "slug": "woo-checkout-fields-manager",
+      "price": 3900,
+      "status": "verified",
+      "author": "Brandon Greenberg",
+      "files": ["plugins/woocommerce-checkout-fields/woocommerce-checkout-fields.php"],
+      "research": {"completed": true, "competitors_found": 0, "review_insights": ["5 unrelated products — none are checkout field managers"]},
+      "triad": {"passed": true, "last_run": "2026-06-06T00:30:00-04:00", "issues": [], "fixes_applied": true},
+      "gumroad_id": null,
+      "listed_at": null
+    },
+    "woocommerce-wholesale-pricing": {
+      "name": "WooCommerce Wholesale Pricing",
+      "slug": "woo-wholesale-pricing",
+      "price": 4900,
+      "status": "verified",
+      "author": "Brandon Greenberg",
+      "files": ["plugins/woocommerce-wholesale-pricing/woocommerce-wholesale-pricing.php"],
+      "research": {"completed": true, "competitors_found": 0, "review_insights": ["4 unrelated products — request quote tools, not pricing"]},
+      "triad": {"passed": true, "last_run": "2026-06-06T00:30:00-04:00", "issues": [], "fixes_applied": true},
+      "gumroad_id": null,
+      "listed_at": null
+    }
+  },
+  "bundles": {
+    "woocommerce-essential-pack": {
+      "name": "WooCommerce Essential Pack",
+      "price": 9900,
+      "includes": ["woocommerce-auto-complete", "woocommerce-custom-badges", "woocommerce-stock-alerts", "woocommerce-checkout-fields", "woocommerce-wholesale-pricing"],
+      "status": "planned",
+      "gumroad_id": null,
+      "listed_at": null
+    }
+  },
+  "pipeline": {
+    "current_stage": "listing",
+    "research_phase_completed": false,
+    "last_action": "2026-06-06T00:40:00-04:00",
+    "plugins_to_list": ["woocommerce-custom-badges", "woocommerce-checkout-fields", "woocommerce-wholesale-pricing"],
+    "next_to_list": "woocommerce-custom-badges",
+    "cron_jobs": {
+      "list-p1": "6bc2e0843101"
+    }
+  },
+  "competitor_research": {
+    "completed": false,
+    "last_search": null,
+    "top_sellers_analyzed": [],
+    "reviews_collected": [],
+    "improvements_queued": []
+  }
+}
