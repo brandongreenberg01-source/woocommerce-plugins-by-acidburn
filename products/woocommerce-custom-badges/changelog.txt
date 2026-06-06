@@ -1,0 +1,17 @@
+= 1.0.0 — June 2026 =
+* Initial public release
+* Feature: Sale badge — auto-detects products on sale using woocommerce_before_shop_loop_item_title and woocommerce_before_single_product_summary hooks
+* Feature: New badge — auto-detects recently published products with configurable "new" duration in days
+* Feature: Featured badge — detects WooCommerce featured products
+* Feature: Custom badge — manually assigned per-product badge with any text and color
+* Feature: WordPress color picker integration for badge background and text colors
+* Feature: 5 position options: top-left, top-right, bottom-left, bottom-right, center
+* Feature: Priority-based badge system — only one badge renders per product (Sale > New > Featured > Custom)
+* Feature: Per-product override meta box — assign badge type, custom text, color, start date, and expiry date
+* Feature: Date-based scheduling — badges can have optional start date and expiry date
+* Feature: Per-product disable toggle
+* Feature: Configurable font size and border radius
+* Feature: Lightweight, CSS-only frontend — zero JavaScript on customer-facing pages
+* Feature: Full uninstall cleanup (options + all post meta)
+* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
+* Dev: WordPress coding standards, proper escaping (esc_html, esc_attr, sanitize_hex_color), nonce verification
