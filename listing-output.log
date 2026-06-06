@@ -1,0 +1,47 @@
+⚠ No auxiliary LLM provider configured — context compression will drop middle turns without a summary. Run `hermes setup` or set OPENROUTER_API_KEY.
+  ┊ review diff
+a//opt/data/sandy_ops/gumroad-store/listing-progress.json → b//opt/data/sandy_ops/gumroad-store/listing-progress.json
+@@ -0,0 +1,43 @@
++{
++  "last_updated": "2026-06-06T01:24:30Z",
++  "products": {
++    "1_woo-order-auto-complete": {
++      "status": "failed_rate_limited",
++      "attempts": 8,
++      "last_attempt": "2026-06-06T01:24:00Z",
++      "error": "HTTP 429 Cloudflare rate limit on POST /v2/products",
++      "name": "WooCommerce Order Auto-Complete — Simple PHP Plugin",
++      "permalink": "woo-order-auto-complete",
++      "price": 1900
++    },
++    "2_woo-custom-product-badges": {
++      "status": "pending",
++      "name": "WooCommerce Custom Product Badges — Sale, New, Featured",
++      "permalink": "woo-custom-product-badges",
++      "price": 1900
++    },
++    "3_woo-stock-alert-system": {
++      "status": "already_exists",
++      "name": "WooCommerce Stock Alert System",
++      "permalink": "woo-stock-alert-system",
++      "gumroad_id": "7UbZaP1LilMcwmq_lpYTNQ=="
++    },
++    "4_woo-checkout-fields-manager": {
++      "status": "pending",
++      "name": "WooCommerce Custom Checkout Fields Manager",
++      "permalink": "woo-checkout-fields-manager",
++      "price": 2900
++    },
++    "5_woo-wholesale-pricing": {
++      "status": "pending",
++      "name": "WooCommerce Wholesale Pricing — Role-Based Tiers",
++      "permalink": "woo-wholesale-pricing",
++      "price": 3900
++    }
++  },
++  "bundles": {
++    "essential-pack": {"status": "pending", "price": 9900},
++    "store-manager-pack": {"status": "pending", "price": 5900}
++  },
++  "notes": "Gumroad API POST /v2/products returns HTTP 429 (Cloudflare rate limit). GET, PUT, DELETE work fine. Token is valid for user brandongreenberg01@gmail.com."
++}
