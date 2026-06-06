@@ -1,0 +1,26 @@
+= 1.0.0 — June 2026 =
+* Initial public release
+* Feature: Role-based wholesale pricing — percentage or fixed discount per WordPress user role
+* Feature: Two pre-configured role slots: Wholesale Customer and Wholesale VIP (editable via settings)
+* Feature: Quantity break tiers per product — progressive discounts at configurable quantity thresholds
+* Feature: Tier types: percentage off or fixed price per unit
+* Feature: Dynamic tier matching based on cart quantity at recalculation time
+* Feature: Per-product fixed wholesale price — overrides all role and quantity discounts
+* Feature: Per-product minimum order quantity enforcement for wholesale customers
+* Feature: Global minimum order quantity setting with per-product override
+* Feature: Validate minimum quantity on add-to-cart, cart update, and before checkout
+* Feature: Price hiding from logged-out guests — prices replaced with configurable login message
+* Feature: Optional Add to Cart button removal for guests (requires price hiding enabled)
+* Feature: Retail price strikethrough display — shows original retail price crossed out next to wholesale price
+* Feature: Custom price labels per role (e.g. "Wholesale", "VIP", "Dealer")
+* Feature: Automatic cart price recalculation on woocommerce_before_calculate_totals
+* Feature: Variable product support via woocommerce_variation_prices_price and per-variation get_price filters
+* Feature: Admin products list column showing wholesale pricing status (fixed price, tier count, or role discount %)
+* Feature: Per-product disable toggle in meta box
+* Feature: Dynamic quantity tier UI — add/remove tiers in product meta box via JavaScript
+* Feature: Price filter priority system: fixed price > quantity tiers > role discount
+* Feature: Wholesale overrides sale price for wholesale users
+* Feature: Admin-only pricing preservation — wholesale prices not applied in wp-admin (except AJAX cart operations)
+* Feature: Full uninstall cleanup — options and all post meta removed
+* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
+* Dev: WordPress coding standards, proper escaping, nonce verification, sanitize_text_field
