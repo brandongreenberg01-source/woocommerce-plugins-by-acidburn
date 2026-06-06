@@ -1,0 +1,22 @@
+= 1.0.0 — June 2026 =
+* Initial public release
+* Feature: Drag-and-drop field reordering with jQuery UI Sortable for billing, shipping, and order sections
+* Feature: 9 field types: Text, Email, Phone, Number, Textarea, Select Dropdown, Radio Buttons, Checkbox, Date Picker
+* Feature: Add unlimited custom fields to any checkout section (billing, shipping, order)
+* Feature: Built-in field control — hide, reorder, and manage all default WooCommerce checkout fields
+* Feature: Conditional display logic — show/hide fields based on other field values (equals, not_equals, contains, empty, not_empty)
+* Feature: Validation rule system — email, phone, numeric range (min/max), and custom regex with custom error messages
+* Feature: Required/optional toggle per field
+* Feature: Custom field values displayed in admin order screen (after billing address)
+* Feature: Custom field values displayed on thank-you page
+* Feature: Custom field values included in WooCommerce order confirmation emails (admin + customer)
+* Feature: AJAX delete for custom fields with nonce verification
+* Feature: AJAX save order for drag-and-drop with nonce verification
+* Feature: Priority-based sorting — each field gets numeric priority updated on reorder
+* Feature: Visual badges for Required, Hidden, Custom, and Conditional fields in admin
+* Feature: Section collapsible headers in admin with field counts
+* Feature: Option parsing for select/radio fields (value|label format, one per line)
+* Feature: Bulk field reordering across all sections
+* Feature: Uninstall cleanup — removes plugin options, preserves order meta
+* Dev: PHP 7.4+, WP 5.0+, WC 4.0+
+* Dev: WordPress coding standards, proper escaping, nonce verification, sanitize_key for field keys
