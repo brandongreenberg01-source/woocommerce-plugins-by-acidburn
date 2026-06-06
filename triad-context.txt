@@ -1,0 +1,691 @@
+# WooCommerce Plugin Suite — Full Code Review
+
+5 standalone WooCommerce plugins for Gumroad marketplace. Each is a single-file PHP plugin with settings API, meta boxes, and WooCommerce hooks.
+
+All plugins use: singleton pattern, nonce verification, sanitize_text_field/sanitize_hex_color input handling, esc_html/esc_attr output escaping, current_user_can capability checks, register_uninstall_hook cleanup.
+
+## woocommerce-auto-complete
+```php
+<?php
+/**
+ * Plugin Name:       WooCommerce Order Auto-Complete
+ * Plugin URI:        https://sandydigital.io
+ * Description:       Automatically mark virtual and downloadable orders as completed. Filter by payment method, per-product toggle, and bulk actions.
+ * Version:           1.0.0
+ * Author:            Brandon Greenberg
+ * Author URI:        https://sandydigital.io
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain:       wc-order-auto-complete
+ * Domain Path:       /languages
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * WC requires at least: 4.0
+ * WC tested up to:   9.0
+ *
+ * @package WC_Order_Auto_Complete
+ */
+
+// If this file is called directly, abort.
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+// WooCommerce dependency check.
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+	return;
+}
+
+/**
+ * Main plugin class.
+ */
+final class WC_Order_Auto_Complete {
+
+	/**
+	 * Plugin instance.
+	 *
+	 * @var WC_Order_Auto_Complete|null
+	 */
+	private static $instance = null;
+
+	/**
+	 * Option name.
+	 *
+	 * @var string
+	 */
+	const OPTION_KEY = 'wc_auto_complete_settings';
+
+	/**
+	 * Get single instance.
+	 *
+	 * @return WC_Order_Auto_Complete
+	 */
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	/**
+	 * Constructor.
+	 */
+	private function __construct() {
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+		add_filter( 'woocommerce_payment_complete_order_status', array( $this, 'maybe_auto_complete' ), 10, 3 );
+		add_action( 'woocommerce_order_status_processing', array( $this, 'auto_complete_on_processing' ), 10, 2 );
+		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
+
+		// Product-level meta box.
+		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
+		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
+
+		// Bulk action on orders.
+		add_filter( 'bulk_actions-edit-shop_order', array( $this, 'add_bulk_actions' ) );
+		add_filter( 'handle_bulk_actions-edit-shop_order', array( $this, 'handle_bulk_actions' ), 10, 3 );
+		add_action( 'admin_notices', array( $this, 'bulk_action_notice' ) );
+	}
+
+	/**
+	 * Load plugin textdomain.
+	 */
+	public function load_textdomain() {
+		load_plugin_textdomain(
+			'wc-order-auto-complete',
+			false,
+			dirname( plugin_basename( __FILE__ ) ) . '/languages'
+		);
+	}
+
+	/**
+	 * Get default settings.
+	 *
+	 * @return array
+	 */
+	private function defaults() {
+		return array(
+
+/* ... middle omitted ... */
+
+function wc_order_auto_complete_uninstall() {
+	delete_option( 'wc_auto_complete_settings' );
+
+	// Delete all post meta.
+	$products = get_posts( array(
+		'post_type'      => array( 'product', 'shop_order' ),
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'meta_key'       => '_wc_auto_complete_disable',
+	) );
+
+	if ( ! empty( $products ) ) {
+		foreach ( $products as $product_id ) {
+			delete_post_meta( $product_id, '_wc_auto_complete_disable' );
+		}
+	}
+
+	$skipped = get_posts( array(
+		'post_type'      => 'shop_order',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'meta_key'       => '_wc_auto_complete_skipped',
+	) );
+
+	if ( ! empty( $skipped ) ) {
+		foreach ( $skipped as $order_id ) {
+			delete_post_meta( $order_id, '_wc_auto_complete_skipped' );
+		}
+	}
+}
+```
+
+## woocommerce-custom-badges
+```php
+<?php
+/**
+ * Plugin Name:       WooCommerce Custom Product Badges
+ * Plugin URI:        https://sandydigital.io
+ * Description:       Add eye-catching "Sale", "New", "Featured", and custom badges to your WooCommerce products. Color picker, scheduling, and per-product overrides.
+ * Version:           1.0.0
+ * Author:            Brandon Greenberg
+ * Author URI:        https://sandydigital.io
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain:       wc-custom-badges
+ * Domain Path:       /languages
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * WC requires at least: 4.0
+ * WC tested up to:   9.0
+ *
+ * @package WC_Custom_Badges
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+	return;
+}
+
+final class WC_Custom_Badges {
+
+	private static $instance = null;
+
+	const OPTION_KEY = 'wc_custom_badges_settings';
+	const META_DISABLE  = '_wc_badge_disable';
+	const META_TYPE     = '_wc_badge_type';
+	const META_TEXT     = '_wc_badge_text';
+	const META_COLOR    = '_wc_badge_color';
+	const META_START    = '_wc_badge_start_date';
+	const META_EXPIRY   = '_wc_badge_expiry_date';
+
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+		add_action( 'woocommerce_before_shop_loop_item_title', array( $this, 'render_badge_loop' ), 10 );
+		add_action( 'woocommerce_before_single_product_summary', array( $this, 'render_badge_single' ), 10 );
+		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
+		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
+		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_frontend_styles' ) );
+	}
+
+	public function load_textdomain() {
+		load_plugin_textdomain( 'wc-custom-badges', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	}
+
+	private function defaults() {
+		return array(
+			'sale_enabled'       => 'yes',
+			'sale_text'          => 'Sale!',
+			'sale_bg_color'      => '#e74c3c',
+			'sale_text_color'    => '#ffffff',
+
+			'new_enabled'        => 'yes',
+			'new_text'           => 'New',
+			'new_bg_color'       => '#2ecc71',
+			'new_text_color'     => '#ffffff',
+			'new_duration_days'  => 30,
+
+			'featured_enabled'   => 'yes',
+			'featured_text'      => 'Featured',
+			'featured_bg_color'  => '#f39c12',
+			'featured_text_color' => '#ffffff',
+
+			'custom_enabled'     => 'no',
+			'custom_text'        => 'Custom',
+			'custom_bg_color'    => '#9b59b6',
+			'custom_text_color'  => '#ffffff',
+
+			'position'           => 'top-left',
+			'font_size'          => 12,
+			'border_radius'      => 3,
+		);
+	}
+
+	private function position_options() {
+		return array(
+			'top-left'      => __( 'Top Left', 'wc-custom-badges' ),
+			'top-right'     => __( 'Top Right', 'wc-custom-badges' ),
+			'bottom-left'   => __( 'Bottom Left', 'wc-custom-badges' ),
+			'bottom-right'  => __( 'Bottom Right', 'wc-custom-badges' ),
+			'center'        => __( 'Center', 'wc-custom-badges' ),
+
+/* ... middle omitted ... */
+
+
+/**
+ * Uninstall cleanup.
+ */
+register_uninstall_hook( __FILE__, 'wc_custom_badges_uninstall' );
+
+function wc_custom_badges_uninstall() {
+	delete_option( 'wc_custom_badges_settings' );
+
+	$meta_keys = array(
+		'_wc_badge_disable',
+		'_wc_badge_type',
+		'_wc_badge_text',
+		'_wc_badge_color',
+		'_wc_badge_start_date',
+		'_wc_badge_expiry_date',
+	);
+
+	$products = get_posts( array(
+		'post_type'      => 'product',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+	) );
+
+	foreach ( $products as $product_id ) {
+		foreach ( $meta_keys as $key ) {
+			delete_post_meta( $product_id, $key );
+		}
+	}
+}
+```
+
+## woocommerce-stock-alerts
+```php
+<?php
+/**
+ * Plugin Name:       WooCommerce Stock Alert System
+ * Plugin URI:        https://sandydigital.io
+ * Description:       Low stock email notifications for WooCommerce. Per-product thresholds, multiple recipients, daily digest, and breach logging.
+ * Version:           1.0.0
+ * Author:            Brandon Greenberg
+ * Author URI:        https://sandydigital.io
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain:       wc-stock-alerts
+ * Domain Path:       /languages
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * WC requires at least: 4.0
+ * WC tested up to:   9.0
+ *
+ * @package WC_Stock_Alerts
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+	return;
+}
+
+final class WC_Stock_Alerts {
+
+	private static $instance = null;
+
+	const OPTION_KEY      = 'wc_stock_alerts_settings';
+	const META_THRESHOLD  = '_wc_stock_alert_threshold';
+	const META_DISABLE    = '_wc_stock_alert_disable';
+	const LOG_TABLE       = 'wc_stock_alert_log';
+
+	/** @var array Cache of already-sent alerts this request to prevent duplicates. */
+	private $sent_this_request = array();
+
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+		add_action( 'init', array( $this, 'maybe_create_log_table' ) );
+
+		// Core triggers.
+		add_action( 'woocommerce_reduce_order_stock', array( $this, 'on_reduce_stock' ) );
+		add_action( 'woocommerce_product_set_stock_status', array( $this, 'on_stock_status_change' ), 10, 3 );
+		add_action( 'woocommerce_product_set_stock', array( $this, 'on_stock_quantity_set' ) );
+		add_action( 'woocommerce_variation_set_stock', array( $this, 'on_variation_stock_set' ) );
+
+		// Admin.
+		add_action( 'admin_menu', array( $this, 'add_admin_pages' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
+		add_action( 'save_post', array( $this, 'save_product_meta_box' ) );
+
+		// Product list column.
+		add_filter( 'manage_edit-product_columns', array( $this, 'add_stock_alert_column' ) );
+		add_action( 'manage_product_posts_custom_column', array( $this, 'render_stock_alert_column' ), 10, 2 );
+
+		// Daily digest cron.
+		add_action( 'wc_stock_alerts_daily_digest', array( $this, 'send_daily_digest' ) );
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
+
+		// Activation hook.
+		register_activation_hook( __FILE__, array( $this, 'activate' ) );
+	}
+
+	public function load_textdomain() {
+		load_plugin_textdomain( 'wc-stock-alerts', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	}
+
+	// ─── Activator ──────────────────────────────────────────
+
+	public function activate() {
+		$this->maybe_create_log_table();
+		if ( ! wp_next_scheduled( 'wc_stock_alerts_daily_digest' ) ) {
+			wp_schedule_event( strtotime( 'tomorrow 08:00' ), 'daily', 'wc_stock_alerts_daily_digest' );
+		}
+	}
+
+	// ─── Database ───────────────────────────────────────────
+
+	public function maybe_create_log_table() {
+		global $wpdb;
+		$table = $wpdb->prefix . self::LOG_TABLE;
+
+		$exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( $exists === $table ) {
+			return;
+		}
+
+		$charset_collate = $wpdb->get_charset_collate();
+
+/* ... middle omitted ... */
+
+}
+
+add_action( 'plugins_loaded', array( 'WC_Stock_Alerts', 'instance' ) );
+
+// Uninstall.
+register_uninstall_hook( __FILE__, 'wc_stock_alerts_uninstall' );
+
+function wc_stock_alerts_uninstall() {
+	global $wpdb;
+
+	delete_option( 'wc_stock_alerts_settings' );
+	wp_clear_scheduled_hook( 'wc_stock_alerts_daily_digest' );
+
+	// Drop log table.
+	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}wc_stock_alert_log" );
+
+	// Clean post meta.
+	$meta_keys = array( '_wc_stock_alert_threshold', '_wc_stock_alert_disable' );
+	$products  = get_posts( array(
+		'post_type'      => 'product',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+	) );
+
+	foreach ( $products as $pid ) {
+		foreach ( $meta_keys as $key ) {
+			delete_post_meta( $pid, $key );
+		}
+	}
+}
+```
+
+## woocommerce-checkout-fields
+```php
+<?php
+/**
+ * Plugin Name:       WooCommerce Custom Checkout Fields Manager
+ * Plugin URI:        https://sandydigital.io
+ * Description:       Add, reorder, and manage custom checkout fields on your WooCommerce checkout page. Drag-drop ordering, conditional display, multiple field types, and validation — no coding required.
+ * Version:           1.0.0
+ * Author:            Brandon Greenberg
+ * Author URI:        https://sandydigital.io
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain:       wc-checkout-fields
+ * Domain Path:       /languages
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * WC requires at least: 4.0
+ * WC tested up to:   9.0
+ *
+ * @package WC_Checkout_Fields
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+	return;
+}
+
+final class WC_Checkout_Fields_Manager {
+
+	private static $instance = null;
+
+	const OPTION_KEY = 'wc_checkout_fields_data';
+
+	/** @var array Built-in default fields. */
+	private $default_fields;
+
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+
+		// Frontend hooks.
+		add_filter( 'woocommerce_checkout_fields', array( $this, 'modify_checkout_fields' ), 99 );
+		add_action( 'woocommerce_checkout_process', array( $this, 'validate_custom_fields' ) );
+		add_action( 'woocommerce_checkout_update_order_meta', array( $this, 'save_custom_fields' ) );
+		add_action( 'woocommerce_admin_order_data_after_billing_address', array( $this, 'display_custom_fields_admin' ) );
+		add_action( 'woocommerce_order_details_after_customer_details', array( $this, 'display_custom_fields_thankyou' ) );
+
+		// Email integration.
+		add_filter( 'woocommerce_email_order_meta_fields', array( $this, 'add_fields_to_email' ), 10, 3 );
+
+		// Admin.
+		add_action( 'admin_menu', array( $this, 'add_admin_page' ) );
+		add_action( 'admin_init', array( $this, 'handle_form_submission' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+		add_action( 'wp_ajax_wc_cf_save_order', array( $this, 'ajax_save_order' ) );
+		add_action( 'wp_ajax_wc_cf_delete_field', array( $this, 'ajax_delete_field' ) );
+
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
+	}
+
+	public function load_textdomain() {
+		load_plugin_textdomain( 'wc-checkout-fields', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	}
+
+	// ─── Defaults ───────────────────────────────────────────
+
+	private function get_default_fields() {
+		if ( null !== $this->default_fields ) {
+			return $this->default_fields;
+		}
+
+		$this->default_fields = array(
+			'billing_first_name' => array(
+				'label'    => __( 'First name', 'wc-checkout-fields' ),
+				'section'  => 'billing',
+				'type'     => 'text',
+				'required' => true,
+				'builtin'  => true,
+			),
+			'billing_last_name' => array(
+				'label'    => __( 'Last name', 'wc-checkout-fields' ),
+				'section'  => 'billing',
+				'type'     => 'text',
+				'required' => true,
+				'builtin'  => true,
+			),
+			'billing_company' => array(
+				'label'   => __( 'Company name', 'wc-checkout-fields' ),
+				'section' => 'billing',
+				'type'    => 'text',
+				'builtin' => true,
+			),
+			'billing_country' => array(
+
+/* ... middle omitted ... */
+
+
+		if ( isset( $this->get_default_fields()[ $key ] ) ) {
+			wp_send_json_error( 'Cannot delete built-in fields.' );
+		}
+
+		$all = $this->get_all_fields();
+		unset( $all[ $key ] );
+		update_option( self::OPTION_KEY, $all );
+
+		wp_send_json_success();
+	}
+
+	public function plugin_action_links( $links ) {
+		$settings_link = sprintf(
+			'<a href="%s">%s</a>',
+			esc_url( admin_url( 'admin.php?page=wc-checkout-fields' ) ),
+			esc_html__( 'Manage Fields', 'wc-checkout-fields' )
+		);
+		array_unshift( $links, $settings_link );
+		return $links;
+	}
+}
+
+add_action( 'plugins_loaded', array( 'WC_Checkout_Fields_Manager', 'instance' ) );
+
+register_uninstall_hook( __FILE__, 'wc_checkout_fields_uninstall' );
+
+function wc_checkout_fields_uninstall() {
+	delete_option( 'wc_checkout_fields_data' );
+}
+```
+
+## woocommerce-wholesale-pricing
+```php
+<?php
+/**
+ * Plugin Name:       WooCommerce Wholesale Pricing
+ * Plugin URI:        https://sandydigital.io
+ * Description:       Role-based wholesale pricing with quantity breaks, minimum orders, and price hiding. Perfect for B2B stores.
+ * Version:           1.0.0
+ * Author:            Brandon Greenberg
+ * Author URI:        https://sandydigital.io
+ * License:           GPL-2.0+
+ * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
+ * Text Domain:       wc-wholesale-pricing
+ * Domain Path:       /languages
+ * Requires at least: 5.0
+ * Requires PHP:      7.4
+ * WC requires at least: 4.0
+ * WC tested up to:   9.0
+ *
+ * @package WC_Wholesale_Pricing
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+	return;
+}
+
+final class WC_Wholesale_Pricing {
+
+	private static $instance = null;
+
+	const OPTION_KEY     = 'wc_wholesale_settings';
+	const META_PRICE     = '_wc_wholesale_price';
+	const META_QTY_RULES = '_wc_wholesale_qty_rules';
+	const META_MIN_QTY   = '_wc_wholesale_min_qty';
+	const META_DISABLE   = '_wc_wholesale_disable';
+
+	/** @var array|null Cached current user roles. */
+	private $user_roles = null;
+
+	/** @var string|null Cached matched wholesale role. */
+	private $wholesale_role = null;
+
+	public static function instance() {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	private function __construct() {
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+
+		// Price hooks.
+		add_filter( 'woocommerce_product_get_price', array( $this, 'filter_price' ), 99, 2 );
+		add_filter( 'woocommerce_product_get_regular_price', array( $this, 'filter_price' ), 99, 2 );
+		add_filter( 'woocommerce_product_get_sale_price', array( $this, 'filter_sale_price' ), 99, 2 );
+		add_filter( 'woocommerce_product_variation_get_price', array( $this, 'filter_price' ), 99, 2 );
+		add_filter( 'woocommerce_product_variation_get_regular_price', array( $this, 'filter_price' ), 99, 2 );
+		add_filter( 'woocommerce_variation_prices_price', array( $this, 'filter_variation_price' ), 99, 3 );
+		add_filter( 'woocommerce_variation_prices_regular_price', array( $this, 'filter_variation_price' ), 99, 3 );
+		add_filter( 'woocommerce_get_price_html', array( $this, 'filter_price_html' ), 99, 2 );
+
+		// Add to cart validation (minimum order).
+		add_filter( 'woocommerce_add_to_cart_validation', array( $this, 'validate_min_qty' ), 99, 3 );
+		add_filter( 'woocommerce_update_cart_validation', array( $this, 'validate_min_qty_update' ), 99, 4 );
+		add_action( 'woocommerce_check_cart_items', array( $this, 'check_cart_quantities' ) );
+
+		// Cart price recalculation.
+		add_action( 'woocommerce_before_calculate_totals', array( $this, 'recalculate_cart_prices' ), 99 );
+
+		// Admin.
+		add_action( 'admin_menu', array( $this, 'add_admin_page' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'add_meta_boxes', array( $this, 'add_product_meta_box' ) );
+		add_action( 'save_post_product', array( $this, 'save_product_meta_box' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_assets' ) );
+
+		// Product list column.
+		add_filter( 'manage_edit-product_columns', array( $this, 'add_product_column' ) );
+		add_action( 'manage_product_posts_custom_column', array( $this, 'render_product_column' ), 10, 2 );
+
+		// Price hiding.
+		add_action( 'wp', array( $this, 'maybe_hide_prices' ) );
+
+		add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), array( $this, 'plugin_action_links' ) );
+	}
+
+	public function load_textdomain() {
+		load_plugin_textdomain( 'wc-wholesale-pricing', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+	}
+
+	// ─── Role Detection ─────────────────────────────────────
+
+	/**
+	 * Get the matched wholesale role for the current user.
+	 *
+	 * @return string|null Role key or null if not a wholesaler.
+	 */
+
+/* ... middle omitted ... */
+
+
+add_action( 'plugins_loaded', array( 'WC_Wholesale_Pricing', 'instance' ) );
+
+/**
+ * Uninstall cleanup.
+ */
+register_uninstall_hook( __FILE__, 'wc_wholesale_pricing_uninstall' );
+
+function wc_wholesale_pricing_uninstall() {
+	delete_option( 'wc_wholesale_settings' );
+
+	$meta_keys = array(
+		'_wc_wholesale_price',
+		'_wc_wholesale_qty_rules',
+		'_wc_wholesale_min_qty',
+		'_wc_wholesale_disable',
+	);
+
+	$products = get_posts( array(
+		'post_type'      => 'product',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+	) );
+
+	foreach ( $products as $pid ) {
+		foreach ( $meta_keys as $key ) {
+			delete_post_meta( $pid, $key );
+		}
+	}
+}
+```
+
